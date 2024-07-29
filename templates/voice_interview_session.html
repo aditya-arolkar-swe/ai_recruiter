@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Interview</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.retellai.com/sdk/1.0.0/retell-sdk.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        #interviewStatus, #transcriptContainer {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9e9e9;
+            border-radius: 4px;
+        }
+        #transcript {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Voice Interview for {{ candidate.name }}</h1>
+        <p>Position: {{ candidate.position }}</p>
+        <button id="startInterview">Start Interview</button>
+        <button id="endInterview" style="display:none;">End Interview</button>
+        <div id="interviewStatus"></div>
+        <div id="transcriptContainer" style="display:none;">
+            <h3>Interview Transcript:</h3>
+            <div id="transcript"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const startButton = document.getElementById('startInterview');
+        const endButton = document.getElementById('endInterview');
+        const statusDiv = document.getElementById('interviewStatus');
+        const transcriptDiv = document.getElementById('transcript');
+        const transcriptContainer = document.getElementById('transcriptContainer');
+        let callId = null;
+        let retellClient = null;
+
+        startButton.addEventListener('click', () => {
+            fetch('/start_voice_interview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    candidate_name: '{{ candidate.name }}',
+                    position: '{{ candidate.position }}'
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    statusDiv.textContent = 'Error: ' + data.error;
+                } else {
+                    callId = data.call_id;
+                    statusDiv.textContent = 'Interview started. Call ID: ' + callId;
+                    startButton.style.display = 'none';
+                    endButton.style.display = 'inline-block';
+                    transcriptContainer.style.display = 'block';
+
+                    // Initialize Retell client
+                    retellClient = new Retell({
+                        socketUrl: data.socket_url,
+                        authToken: data.auth_token
+                    });
+
+                    // Start the call
+                    retellClient.start();
+
+                    // Handle incoming messages
+                    retellClient.on('message', (message) => {
+                        if (message.type === 'transcript') {
+                            appendToTranscript('AI: ' + message.text);
+                        } else if (message.type === 'recognized_speech') {
+                            appendToTranscript('You: ' + message.text);
+                        }
+                    });
+
+                    // Handle errors
+                    retellClient.on('error', (error) => {
+                        console.error('Retell error:', error);
+                        statusDiv.textContent = 'Error: ' + error.message;
+                    });
+                }
+            });
+        });
+
+        endButton.addEventListener('click', () => {
+            if (retellClient) {
+                retellClient.stop();
+                statusDiv.textContent = 'Interview ended.';
+                endButton.style.display = 'none';
+            }
+        });
+
+        function appendToTranscript(text) {
+            const p = document.createElement('p');
+            p.textContent = text;
+            transcriptDiv.appendChild(p);
+            transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>

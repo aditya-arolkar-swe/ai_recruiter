@@ -167,7 +167,7 @@ def ai_response():
 	messages = data['messages']
 
 	try:
-		response = openai.ChatCompletion.create(
+		response = openai.chat.completions.create(
 			model="gpt-3.5-turbo",
 			messages=messages
 		)

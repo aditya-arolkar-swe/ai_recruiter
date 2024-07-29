@@ -135,7 +135,7 @@ def interview_session(invite_id):
     if candidate.interview_completed:
         return "This interview has already been completed.", 400
 
-    return render_template('interview_session.html', candidate=candidate)
+    return render_template('voice_interview_session.html', candidate=candidate)
 
 @app.route('/start_interview/<int:id>', methods=['POST'])
 def start_interview(id):
